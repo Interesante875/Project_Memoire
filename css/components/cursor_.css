@@ -1,0 +1,61 @@
+#cursor {
+    /* Set the cursor's size, shape, and position */
+    width: 3rem;
+    height: 3rem;
+    border: 2px solid #EBD2BE;
+    border-radius: 70%;
+    position: fixed;
+    z-index: 1000;
+    pointer-events: none;
+    /* Set the cursor's initial opacity and transition effect */
+    opacity: 0;
+    transition: all 0.15s ease-out;
+    /* Add a series of overlapping shadows to create a soft trail effect */
+    box-shadow: 0 0 0 1px #fff, 0 0 0 1px #fff, 0 0 0 1px #fff;
+}
+  
+#inner-cursor {
+    /* Set the inner cursor's size, shape, and position */
+    width: 120px;
+    height: 120px;
+    border: 3px solid #fff;
+    border-radius: 20%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    /* Set the inner cursor's initial opacity and transition effect */
+    opacity: 0;
+    transition: all 1.2s ease-out;
+}
+  
+/* Show the cursor when the user moves their mouse */
+body:hover #cursor {
+    opacity: 0.5;
+}
+  
+  /* Pulse the inner cursor on click */
+#cursor.clicked #inner-cursor {
+    /* Set the inner cursor's pulse animation */
+    animation: pulse 1.0s ease-out;
+    animation-iteration-count: 1;
+}
+
+  /* Keyframes for the pulse animation */
+@keyframes pulse {
+    0% {
+      /* Start with no size and full transparency */
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0;
+    }
+    50% {
+      /* Increase size and reduce transparency */
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0.5;
+    }
+    100% {
+      /* Return to original size and full transparency */
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0;
+    }
+}

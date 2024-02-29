@@ -1,0 +1,77 @@
+@media screen and (min-width: 30em) and (orientation: landscape) {
+    body {
+        box-sizing: border-box;
+        background-color: #201713;
+        font-size: 100%;
+        font-weight: 400;
+        font-style: 'Literata' sans-serif;
+        color: #DECECE;
+        cursor: none;
+    
+        /* Use the "bg.jpg" image as the background */
+        background-image: url('../.././assets/background/background.png');
+        /* Scale the background image to cover the entire page */
+        background-size: cover;
+        /* Center the background image */
+        background-position: center;
+        /* Set the background image's attachment and repeat properties */
+        background-attachment: fixed;
+        background-repeat: no-repeat; 
+        z-index: 1;
+        display: flex;
+        justify-content: center;
+        
+    }
+
+    .background__container {
+        position: relative;
+        width: 99vw;
+        height: 99vh;
+        border: 1px solid #fff;
+        z-index: 2;
+    }
+
+    .ribbon__container {
+        display: flex;
+        position: absolute;
+        width: 84vw;
+        height: 100%;
+        right: 0;
+        border: 3px solid #fff;
+        z-index: 10;
+    }
+
+    .ribbon__top {
+        position: absolute;
+        width: 87%;
+        height: 22%;
+        margin-top: 0;
+        border: 3px solid #fff;
+        z-index: inherit;
+    }
+
+    .ribbon__bottom {
+        position: absolute;
+        width: 25%;
+        height: 49%;
+        right: 0;
+        bottom: 0;
+        border: 3px solid #fff;
+        z-index: inherit;
+    }
+
+    .book__container {
+        position: absolute;
+        width: 52%;
+        height: 91%;
+        left: 0;
+        bottom: 0;
+        border: 3px solid #fff;
+        z-index: 20;
+    }
+}
+
+
+
+
+

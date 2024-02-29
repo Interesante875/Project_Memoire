@@ -1,0 +1,253 @@
+@import "../components/animation.css";
+
+@media screen and (min-width: 35em) and (orientation: landscape) {
+    body {
+        box-sizing: border-box;
+        background-color: #201713;
+        font-size: 100%;
+        font-weight: 400;
+        font-style: 'Literata' sans-serif;
+        color: #DECECE;
+        cursor: none;
+        /* Use the "bg.jpg" image as the background */
+        background-image: url('../.././assets/background/background_2.png');
+        /* Scale the background image to cover the entire page */
+        background-size: cover;
+        /* Center the background image */
+        background-position: center;
+        /* Set the background image's attachment and repeat properties */
+        background-attachment: fixed;
+        background-repeat: no-repeat; 
+        z-index: 1;
+        display: flex;
+        justify-content: center;
+        
+    }
+    
+    .background__container {
+        display: flex;
+        position: relative;
+        width: 99vw;
+        height: 99vh;
+        
+    }
+
+    .decorator__container {
+        position: absolute;
+        width: 30vw;
+        height: 100%;
+        /* border: 3px solid #fff; */
+        right: 3vw;
+    }
+
+    .decorator__word {
+        position: absolute;
+        height: 90%;
+        width: 90%;
+        aspect-ratio: 1/5;
+    
+        /* border: 3px solid rgb(37, 18, 74); */
+        right: 0%;
+        top: 7%;
+
+        background-image: url('../.././assets/background/decorator_5.png');
+        background-size: contain;
+        background-attachment: local;
+        background-clip: border-box;
+        background-repeat: no-repeat; 
+        z-index: 2;
+    }
+
+    .decorator__talent {
+        position: absolute;
+        height: 50%;
+        width: 40%;
+        aspect-ratio: 1/1.5;
+        /* border: 3px solid rgb(3, 3, 3); */
+        right: 18%;
+        bottom: 8%;
+
+        background-image: url('../.././assets/background/decorator_2.png');
+        background-size: contain;
+        background-attachment: local;
+        background-clip: border-box;
+        background-repeat: no-repeat; 
+
+        z-index: 4;
+    }
+
+    .decorator__logo {
+        position: absolute;
+        height: 60%;
+        width: 15%;
+        aspect-ratio: 1/5;
+        /* border: 3px solid rgb(165, 152, 193); */
+        left: 32%;
+        bottom: 8%;
+
+        background-image: url('../.././assets/logo/logo_2.png');
+        background-size: contain;
+        background-attachment: local;
+        background-clip: border-box;
+        background-repeat: no-repeat; 
+
+        z-index: 4;
+    }
+
+    .decorator__star {
+        position: absolute;
+        height: 30%;
+        width: 15%;
+        aspect-ratio: 1/5;
+        /* border: 3px solid rgb(165, 152, 193); */
+        left: 10%;
+        bottom: 20%;
+
+        background-image: url('../.././assets/background/decorator_1.png');
+        background-size: contain;
+        background-attachment: local;
+        background-clip: border-box;
+        background-repeat: no-repeat; 
+        z-index: 4;
+    }
+
+    .decorator__umbrella {
+        position: absolute;
+        height: 40%;
+        width: 70%;
+        aspect-ratio: 1/1;
+    
+        /* border: 3px solid rgb(18, 74, 70); */
+        left: 0;
+        bottom: 0;
+
+        background-image: url('../.././assets/background/decorator_4.png');
+        background-size: contain;
+        background-attachment: local;
+        background-clip: border-box;
+        background-repeat: no-repeat; 
+        
+        z-index: 3;
+    }
+
+    .banner__container {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 1rem;
+        position: absolute;
+        width: 60vw;
+        height: 100%;
+        /* border: 3px solid rgb(152, 14, 14); */
+        left: 0;
+        top: 0;
+        transition: all 0.5s;
+        overflow-x: scroll;
+    }
+
+    .banner__container--character {
+        position: relative;
+    
+        width: 14.5rem;
+        height: 40rem;
+        
+        /* border: 3px solid rgb(25, 14, 152); */
+        transition: transform 0.5s;
+    }
+
+    .banner__container--character img {
+        position: absolute;
+        width: 41rem;
+        left: -11.9rem;
+    }
+
+    /* @media screen and (max-width: 3840px) {
+        .banner__container--character img {
+            object-position: -21rem;
+        }
+    }
+    @media screen and (max-width: 3200px) {
+        .banner__container--character img {
+            object-position: -19rem;
+        }
+    }
+    @media screen and (max-width: 2736px) {
+        .banner__container--character img {
+            object-position: -19rem;
+        }
+    }
+    @media screen and (max-width: 2560px) {
+        .banner__container--character img {
+            object-position: -15rem;
+        }
+    }
+    @media screen and (max-width: 2256px) {
+        .banner__container--character img {
+            object-position: -16rem;
+        }
+    }
+    @media screen and (max-width: 1920px) {
+        .banner__container--character img {
+            object-position: -10.5rem;
+        }
+    }
+
+    @media screen and (max-width: 1366px) {
+        .banner__container--character img {
+            object-position: -7.45rem;
+        }
+    }
+
+    @media screen and (max-width: 1280px) {
+        .banner__container--character img {
+            object-position: -8.5rem;
+        }
+    }
+
+    @media screen and (max-width: 1024px) {
+        .banner__container--character img {
+            object-position: -7.7rem;
+        }
+    } */
+
+    
+
+    
+
+    
+
+    .banner__container--character:hover {
+        transform: translateY(2.0rem);
+    }
+
+    @media screen and (min-width: 2000px) {
+        .banner__container--character img {
+            margin-top: -5.75rem;
+        }
+        .banner__container--character:hover {
+            transform: translateY(2.5rem);
+        }
+    }
+
+    @media screen and (min-width: 2700px) {
+        .banner__container--character img {
+            margin-top: -6rem;
+        }
+        .banner__container--character:hover {
+            transform: translateY(2.8rem);
+        }
+    }
+
+    @media screen and (min-width: 3500px) {
+        .banner__container--character img {
+            margin-top: -8rem;
+        }
+        .banner__container--character:hover {
+            transform: translateY(3.5rem);
+        }
+    }
+
+    
+
+    
+}
