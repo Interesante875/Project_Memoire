@@ -68,15 +68,47 @@ On Windows and macOS, the virtual camera needs OBS installed. On Linux it needs 
 python -m memoire_rig rig --source photo.jpg
 ```
 
+## Anime characters
+
+LivePortrait is trained on real faces and usually misses anime faces; in testing it locked onto a hair ornament instead of the face. For anime art, use the anime engine, built on [Talking Head Anime 3](https://github.com/pkhungurn/talking-head-anime-3-demo) by Pramook Khungurn (code MIT, models CC BY 4.0, so you must credit the author if you redistribute the models).
+
+```bash
+python setup_liveportrait.py --anime --no-pip --no-weights   # ~830 MB of models
+python -m memoire_rig anime --source character.png
+```
+
+**Input:** a PNG with a transparent background and one upright, front-facing character.
+
+**What it does:**
+
+1. **Finds the head** with an anime face detector ([lbpcascade_animeface](https://github.com/nagadomi/lbpcascade_animeface)). If the detector isn't available, it falls back to the silhouette.
+2. **Lays the character out** on THA3's 512×512 template, with the head in the 128 px box.
+3. **Renders a seamless loop** using THA3's 45-parameter rig: idle sway and breathing, blinks, a few seconds of talking with vowel mouth shapes, and a smile.
+
+**Output** goes to `renders/`:
+
+- an MP4
+- a transparent-background WebM for OBS overlays
+- a GIF preview
+- the laid-out rig input
+
+**Options:**
+
+- `--head cx,cy,size` overrides head placement.
+- `--seconds` and `--fps` change the loop length and frame rate.
+
+On CPU it runs at about 0.8 s per frame. On a GPU it is real-time.
+
 ## Tips
 
 - Use a sharp, front-facing photo with one person and the full face visible, ideally with eyes open and mouth closed.
 - Keep your webcam face roughly the same size and pose as when you calibrated. Motion is relative to that pose.
-- LivePortrait is trained on real faces. Anime or very stylised art often fails detection. For anime characters, [Talking Head Anime](https://github.com/pkhungurn/talking-head-anime-3-demo) and [EasyVtuber](https://github.com/yuyuyzl/EasyVtuber) are better engines.
+- For anime or very stylised art, use the anime engine (above).
 
 ## Licensing
 
 - LivePortrait's code is MIT licensed.
+- The Talking Head Anime 3 models are CC BY 4.0, so you must credit Pramook Khungurn. The anime face detector declares no license, and it is downloaded only as an optional file.
 - LivePortrait uses **InsightFace detection models, which are for non-commercial research only**. Replace them before any commercial use.
 - Only animate people who have consented to it.
 
@@ -89,6 +121,7 @@ rigger/
     engine.py             auto-rig, per-frame posing, expression edits, face tracker
     session.py            webcam + controls + idle autopilot -> frames
     server.py             FastAPI: /api/source upload, /ws lock-step frame stream
-    __main__.py           CLI: serve | cam | rig
+    anime.py              anime engine: head finding, THA3 layout, performance loop, export
+    __main__.py           CLI: serve | cam | rig | anime
   web/                    browser studio (index.html, app.js, style.css)
 ```
