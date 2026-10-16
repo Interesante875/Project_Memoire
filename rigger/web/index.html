@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memoire Rig</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header>
+    <h1>Memoire Rig</h1>
+    <p class="tagline">One photo in, a live VTuber out. Powered by open-source <a href="https://github.com/KwaiVGI/LivePortrait" target="_blank" rel="noopener">LivePortrait</a>.</p>
+    <span id="device" class="pill">connecting…</span>
+  </header>
+
+  <main>
+    <aside id="panel">
+      <section>
+        <h2><span class="step">1</span> Source portrait</h2>
+        <label id="drop" class="drop" tabindex="0">
+          <input id="file" type="file" accept="image/*" hidden />
+          <span>Drop, paste or click to choose a photo</span>
+          <small>Front-facing, one person, face clearly visible</small>
+        </label>
+        <button id="snap" class="ghost">Use a webcam snapshot instead</button>
+      </section>
+
+      <section>
+        <h2><span class="step">2</span> Auto-rig</h2>
+        <p id="rigStatus" class="muted">Waiting for a portrait.</p>
+        <dl id="rigInfo" hidden></dl>
+        <label class="row"><input id="showRig" type="checkbox" checked /> Show rig overlay on source</label>
+      </section>
+
+      <section>
+        <h2><span class="step">3</span> Perform</h2>
+        <div class="buttons">
+          <button id="cam">Start webcam</button>
+          <button id="calib" class="ghost" disabled>Set neutral pose</button>
+          <button id="mic" class="ghost">Mic lip-sync</button>
+        </div>
+        <label class="row"><input id="idle" type="checkbox" checked /> Idle life (blink, breathe, sway)</label>
+        <label class="slider">Motion strength <input data-c="strength" type="range" min="0" max="2" step="0.05" value="1" /></label>
+
+        <details>
+          <summary>Rig controls</summary>
+          <label class="slider">Head yaw <input data-c="yaw" type="range" min="-30" max="30" step="0.5" value="0" /></label>
+          <label class="slider">Head pitch <input data-c="pitch" type="range" min="-20" max="20" step="0.5" value="0" /></label>
+          <label class="slider">Head roll <input data-c="roll" type="range" min="-20" max="20" step="0.5" value="0" /></label>
+          <label class="slider">Smile <input data-c="smile" type="range" min="-0.3" max="1.3" step="0.01" value="0" /></label>
+          <label class="slider">Wink <input data-c="wink" type="range" min="0" max="39" step="0.5" value="0" /></label>
+          <label class="slider">Eyebrow <input data-c="eyebrow" type="range" min="-30" max="30" step="0.5" value="0" /></label>
+          <label class="slider">Gaze ↔ <input data-c="gaze_x" type="range" min="-30" max="30" step="0.5" value="0" /></label>
+          <label class="slider">Gaze ↕ <input data-c="gaze_y" type="range" min="-63" max="63" step="0.5" value="0" /></label>
+          <label class="slider"><span><input id="eyeOn" type="checkbox" /> Eyes open</span> <input data-c="eye_open" type="range" min="0" max="1.5" step="0.01" value="1" /></label>
+          <label class="slider"><span><input id="mouthOn" type="checkbox" /> Mouth open</span> <input data-c="mouth_open" type="range" min="0" max="1" step="0.01" value="0" /></label>
+          <button id="reset" class="ghost">Reset controls</button>
+        </details>
+      </section>
+
+      <section>
+        <h2><span class="step">4</span> Output</h2>
+        <div class="buttons">
+          <button id="rec" class="ghost" disabled>Record clip</button>
+          <button id="png" class="ghost" disabled>Save frame</button>
+          <button id="full" class="ghost" disabled>Fullscreen stage</button>
+        </div>
+        <p class="muted small">For OBS, Zoom or Discord, run <code>python -m memoire_rig cam --source photo.jpg --virtualcam</code>.</p>
+      </section>
+    </aside>
+
+    <section id="stage">
+      <div class="frames">
+        <figure>
+          <div class="frame" id="sourceFrame">
+            <canvas id="source"></canvas>
+          </div>
+          <figcaption>Source &amp; rig</figcaption>
+        </figure>
+        <figure class="main">
+          <div class="frame" id="outFrame">
+            <canvas id="out"></canvas>
+            <span id="fps" class="pill overlay"></span>
+          </div>
+          <figcaption>Avatar</figcaption>
+        </figure>
+      </div>
+      <video id="video" playsinline muted></video>
+      <p id="log" class="muted small"></p>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

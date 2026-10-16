@@ -1,0 +1,9 @@
+# Memoire Rig: server + tooling. LivePortrait's own requirements are installed
+# by setup_liveportrait.py from the pinned vendor checkout.
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+huggingface_hub>=0.23
+requests>=2.31
+# Optional: send the avatar to OBS / Zoom / Discord as a virtual webcam.
+pyvirtualcam>=0.11

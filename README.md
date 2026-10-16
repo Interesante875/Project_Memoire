@@ -5,3 +5,6 @@ Project_Memoire is a demo page created for a VTuber (Virtual YouTuber) company. 
 
 ![Image of Demo Page](demo/demo.png)
 
+
+## Memoire Rig (AI VTuber rigging)
+`rigger/` turns a single portrait photo into a live, webcam-driven VTuber avatar using the open-source LivePortrait engine. See [rigger/README.md](rigger/README.md).
