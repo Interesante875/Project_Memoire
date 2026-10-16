@@ -99,6 +99,56 @@ python -m memoire_rig anime --source character.png
 
 On CPU it runs at about 0.8 s per frame. On a GPU it is real-time.
 
+### Expressions and accessory physics
+
+Add an accessory rig to render an expression showreel in which the hair and ornaments have their own physics:
+
+```bash
+python -m memoire_rig anime --source character.png --accessories accessories.json
+```
+
+**Expressions.** There are nine expressions: neutral, happy, laugh, surprised, wink, smug, angry, sad and sleepy. Each one is a THA3 face preset plus its own acting: hops, a head snap, a head shake, a slow droop, or nodding off and jerking awake. The timeline blends smoothly from one to the next and adds breathing and blinks. The presets are also written out as `*_expressions.json`.
+
+**Accessory physics.** Each accessory gets the Live2D treatment:
+
+1. It is cut into its own layer, and the base is inpainted behind it.
+2. THA3 poses the base.
+3. Each layer follows the head via optical flow around its anchor, then bends as a damped pendulum chain.
+
+The simulation runs at 10 sub-steps per frame, in the head's frame of reference. It models:
+
+- a spring back to the drawn pose, with damping
+- lag from the anchor's acceleration
+- gravity pulling hanging parts toward world-down when the head tilts
+- drag when the head rotates
+- an optional second segment that whips, for an S-curve
+- an optional axial spring, so hair stretches on landings and compresses on the rebound
+- light wind
+
+Bends are zero at the attachment and grow toward the tip, so there is no seam where a part joins the head.
+
+`accessories.json` uses coordinates on the 512×512 layout. They are written to `*_rig_input.png`, and `*_layers.png` shows the result:
+
+```json
+{"accessories": [
+  {"name": "ponytail", "segments": 2,
+   "polygon": [[306,58],[332,60],[352,100],[364,160],[368,258],[322,258],[318,140]],
+   "anchor": [312,78], "tip": [348,252],
+   "stiffness": 4, "damping": 1.7, "gravity": 0.9, "inertia": 1.3,
+   "stiffness2": 14, "damping2": 2.6, "follow": 0.7,
+   "stretch_stiffness": 70, "max_stretch": 0.07, "wind": 0.25, "max_angle": 0.55},
+  {"name": "leaf_ornament", "polygon": [[160,113],[200,112],[204,128],[172,140]],
+   "anchor": [201,124], "tip": [162,130], "stiffness": 170, "damping": 8, "inertia": 0.55, "wind": 0.4}
+]}
+```
+
+**Tuning guide:**
+
+- **Long hair:** low `stiffness` with `gravity`, so it hangs and swings slowly.
+- **Small ornaments:** high `stiffness` with low `inertia`, so they flick and settle fast.
+- **More bounce:** lower `damping`.
+- **Limit the swing:** use `max_angle`, in radians.
+
 ## Tips
 
 - Use a sharp, front-facing photo with one person and the full face visible, ideally with eyes open and mouth closed.
@@ -122,6 +172,8 @@ rigger/
     session.py            webcam + controls + idle autopilot -> frames
     server.py             FastAPI: /api/source upload, /ws lock-step frame stream
     anime.py              anime engine: head finding, THA3 layout, performance loop, export
+    expressions.py        expression presets, acting motions, timeline, head kinematics
+    physics.py            accessory layers, pendulum-chain + stretch physics, bend warp
     __main__.py           CLI: serve | cam | rig | anime
   web/                    browser studio (index.html, app.js, style.css)
 ```

@@ -11,6 +11,8 @@ import json
 import sys
 import time
 
+import numpy as np
+
 
 def cmd_serve(args, engine):
     import uvicorn
@@ -104,8 +106,10 @@ def cmd_anime(args):
     Image.fromarray(canvas, "RGBA").save(out_dir / f"{name}_rig_input.png")
 
     rig = AnimeRig(model=args.model, device=args.device)
-    rig.load(canvas)
     t = time.perf_counter()
+    if args.accessories:
+        return anime_showreel(args, rig, canvas, out_dir, name, t)
+    rig.load(canvas)
 
     def progress(i, n):
         print(f"\rRendering {i}/{n} frames ({(time.perf_counter() - t) / i:.2f}s/frame)", end="", flush=True)
@@ -114,6 +118,48 @@ def cmd_anime(args):
     print()
     for p in save_outputs(frames, out_dir, name, args.fps, scale=args.scale):
         print(f"Wrote {p}")
+
+
+def anime_showreel(args, rig, canvas, out_dir, name, t0):
+    """Expressions + accessory physics, rendered as one showreel."""
+    import cv2
+
+    from .anime import StreamWriter, crop_box, render_showreel
+    from .expressions import FACES, Timeline
+    from .physics import LayeredRig, load_accessories
+
+    layered = LayeredRig(canvas, load_accessories(args.accessories))
+    cv2.imwrite(str(out_dir / f"{name}_layers.png"), cv2.cvtColor(layered.overlay(canvas), cv2.COLOR_RGB2BGR))
+    (out_dir / f"{name}_expressions.json").write_text(json.dumps(FACES, indent=1))
+    timeline = Timeline()
+    x0, y0, x1, y1 = crop_box([canvas], margin=0)
+    m = 28  # head motion, bounces and swinging parts need room
+    box = (max(0, x0 - m), max(0, y0 - m - 10), min(512, x1 + m), min(512, y1 + 4))
+    writer = StreamWriter(out_dir, f"{name}_showreel", args.fps, box, scale=args.scale)
+    stills, seen = {}, None
+
+    def progress(i, n):
+        print(f"\rRendering {i}/{n} frames ({(time.perf_counter() - t0) / i:.2f}s/frame)", end="", flush=True)
+
+    for i, (frame, expr) in enumerate(render_showreel(rig, layered, timeline, args.fps, progress=progress)):
+        flat = writer.add(frame)
+        if expr != seen:
+            seen, start = expr, i
+        if i - start == int(args.fps * 1.1) and expr not in stills:  # mid-expression still
+            stills[expr] = flat
+    print()
+    for p in writer.close():
+        print(f"Wrote {p}")
+    if stills:
+        h = min(f.shape[0] for f in stills.values())
+        tiles = []
+        for k, f in stills.items():
+            f = cv2.resize(f, (int(f.shape[1] * h / f.shape[0]), h))
+            cv2.putText(f, k, (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (60, 40, 40), 2, cv2.LINE_AA)
+            tiles.append(f)
+        sheet = out_dir / f"{name}_expressions.jpg"
+        cv2.imwrite(str(sheet), cv2.cvtColor(np.hstack(tiles), cv2.COLOR_RGB2BGR))
+        print(f"Wrote {sheet}")
 
 
 def main():
@@ -138,6 +184,7 @@ def main():
     a = sub.add_parser("anime", help="rig + animate an anime character (Talking Head Anime 3)")
     a.add_argument("--source", required=True, help="PNG with a transparent background")
     a.add_argument("--head", help="override head as cx,cy,size in source pixels")
+    a.add_argument("--accessories", help="accessory physics rig (JSON); renders the expression showreel")
     a.add_argument("--out", default="renders")
     a.add_argument("--seconds", type=float, default=8.0)
     a.add_argument("--fps", type=int, default=24)

@@ -130,7 +130,8 @@ class AnimeRig:
 
         pose = self.torch.zeros(len(self.names), device=self.device, dtype=self.dtype)
         for k, v in params.items():
-            pose[self.names.index(k)] = v
+            lo = -1.0 if k.startswith(("head_", "neck_", "body_", "iris_rotation")) else 0.0
+            pose[self.names.index(k)] = min(1.0, max(lo, v))
         with self.torch.no_grad():
             out = self.poser.pose(self.image, pose)[0].float().cpu()
         rgba = (np.clip(convert_output_image_from_torch_to_numpy(out), 0, 1) * 255).round().astype(np.uint8)
@@ -238,3 +239,80 @@ def save_outputs(frames: list[np.ndarray], out_dir: Path, name: str, fps: int, s
     half[0].save(gif, save_all=True, append_images=half[1:], duration=int(1000 / fps), loop=0, optimize=True)
     paths.append(gif)
     return paths
+
+
+class StreamWriter:
+    """Writes frames as they are rendered: MP4 on a background colour, a
+    transparent WebM (VP9 alpha) for OBS, and a half-size GIF preview."""
+
+    def __init__(self, out_dir: Path, name: str, fps: int, box, scale=2.0, background=(246, 239, 228)):
+        import imageio.v2 as imageio
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        self.box, self.scale, self.fps = box, scale, fps
+        x0, y0, x1, y1 = box
+        self.size = (int((x1 - x0) * scale) // 2 * 2, int((y1 - y0) * scale) // 2 * 2)
+        self.bg = np.array(background, np.float32)
+        self.paths = [out_dir / f"{name}.mp4", out_dir / f"{name}_transparent.webm", out_dir / f"{name}.gif"]
+        self.mp4 = imageio.get_writer(self.paths[0], fps=fps, codec="libx264", quality=8, macro_block_size=2)
+        self.webm = imageio.get_writer(self.paths[1], fps=fps, codec="libvpx-vp9", pixelformat="yuva420p",
+                                       output_params=["-auto-alt-ref", "0", "-b:v", "2M"], macro_block_size=2)
+        self.gif = []
+
+    def add(self, rgba: np.ndarray) -> np.ndarray:
+        import cv2
+        from PIL import Image
+
+        x0, y0, x1, y1 = self.box
+        big = cv2.resize(rgba[y0:y1, x0:x1], self.size, interpolation=cv2.INTER_LANCZOS4)
+        a = big[..., 3:4].astype(np.float32) / 255
+        flat = (big[..., :3] * a + self.bg * (1 - a)).astype(np.uint8)
+        self.mp4.append_data(flat)
+        self.webm.append_data(big)
+        if len(self.gif) < 2000:
+            half = cv2.resize(flat, (self.size[0] // 2, self.size[1] // 2), interpolation=cv2.INTER_AREA)
+            self.gif.append(Image.fromarray(half))
+        return flat
+
+    def close(self) -> list[Path]:
+        self.mp4.close()
+        self.webm.close()
+        g = self.gif
+        g[0].save(self.paths[2], save_all=True, append_images=g[1:], duration=int(1000 / self.fps), loop=0, optimize=True)
+        return self.paths
+
+
+def render_showreel(rig: AnimeRig, layered, timeline, fps: int = 24, substeps: int = 10, progress=None):
+    """Yields (rgba_frame, expression_name). THA3 poses the base; accessory
+    layers follow the head and are simulated with sub-stepped physics."""
+    from .expressions import head_point
+    from .physics import back_flow
+
+    rig.load(layered.base)
+    neutral = rig.render({})
+    layered.set_reference(neutral)
+    n = int(round(timeline.duration * fps))
+    dt = 1.0 / fps
+    h = dt / substeps
+
+    def kin(t, pt):
+        p, root, _ = timeline.at(max(0.0, t))
+        return head_point(p, root, pt)
+
+    for i in range(n):
+        t = i * dt
+        for k in range(substeps):
+            ts = t - dt + (k + 1) * h
+            if ts - h < 0:
+                continue  # no history before t=0: avoid a fake kick
+            for a in layered.acc:
+                pt = np.array(a.anchor, float)
+                (x0, r0), (x1, r1), (x2, r2) = kin(ts - h, pt), kin(ts, pt), kin(ts + h, pt)
+                acc = (x2 - 2 * x1 + x0) / (h * h)
+                a.step(h, acc, r1, (r2 - 2 * r1 + r0) / (h * h), ts)
+        p, root, name = timeline.at(t)
+        frame = rig.render(p)
+        flow = back_flow(frame, neutral)
+        yield layered.compose(frame, flow, root), name
+        if progress:
+            progress(i + 1, n)
