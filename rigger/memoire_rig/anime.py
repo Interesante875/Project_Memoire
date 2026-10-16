@@ -259,12 +259,14 @@ class StreamWriter:
                                        output_params=["-auto-alt-ref", "0", "-b:v", "2M"], macro_block_size=2)
         self.gif = []
 
-    def add(self, rgba: np.ndarray) -> np.ndarray:
+    def add(self, rgba: np.ndarray, final: bool = False) -> np.ndarray:
+        """Adds a 512 canvas frame, or (final=True) an already framed and
+        scaled frame of self.size."""
         import cv2
         from PIL import Image
 
         x0, y0, x1, y1 = self.box
-        big = cv2.resize(rgba[y0:y1, x0:x1], self.size, interpolation=cv2.INTER_LANCZOS4)
+        big = rgba if final else cv2.resize(rgba[y0:y1, x0:x1], self.size, interpolation=cv2.INTER_LANCZOS4)
         a = big[..., 3:4].astype(np.float32) / 255
         flat = (big[..., :3] * a + self.bg * (1 - a)).astype(np.uint8)
         self.mp4.append_data(flat)
@@ -282,9 +284,13 @@ class StreamWriter:
         return self.paths
 
 
-def render_showreel(rig: AnimeRig, layered, timeline, fps: int = 24, substeps: int = 10, progress=None):
-    """Yields (rgba_frame, expression_name). THA3 poses the base; accessory
-    layers follow the head and are simulated with sub-stepped physics."""
+def render_showreel(rig: AnimeRig, layered, timeline, fps: int = 24, substeps: int = 10, progress=None,
+                    eyes_rest: dict | None = None):
+    """Yields (rgba_frame, expression_name, extras). THA3 poses the base;
+    accessories follow the head and are simulated with sub-stepped physics.
+    With `eyes_rest`, eye closing is left to the crisp eye pass (eyes.py) and
+    extras carry the eye states and the head transform for it."""
+    from . import eyes as E
     from .expressions import head_point
     from .physics import back_flow
 
@@ -294,6 +300,10 @@ def render_showreel(rig: AnimeRig, layered, timeline, fps: int = 24, substeps: i
     n = int(round(timeline.duration * fps))
     dt = 1.0 / fps
     h = dt / substeps
+    mid = None
+    if eyes_rest:
+        cs = [(e.cx, e.cy) for e in eyes_rest.values()]
+        mid = np.mean(cs, 0)
 
     def kin(t, pt):
         p, root, _ = timeline.at(max(0.0, t))
@@ -311,8 +321,67 @@ def render_showreel(rig: AnimeRig, layered, timeline, fps: int = 24, substeps: i
                 acc = (x2 - 2 * x1 + x0) / (h * h)
                 a.step(h, acc, r1, (r2 - 2 * r1 + r0) / (h * h), ts)
         p, root, name = timeline.at(t)
+        extras = {"root": root}
+        if eyes_rest:
+            extras["eye_states"] = E.eye_states(p)
+            p = E.strip_eye_closing(p)
         frame = rig.render(p)
         flow = back_flow(frame, neutral)
-        yield layered.compose(frame, flow, root), name
+        if eyes_rest:
+            from .physics import Accessory
+
+            probe = Accessory(name="eyes", polygon=[], anchor=list(mid), tip=list(mid + [0, 1]))
+            M = layered.head_transform(probe, flow, radius=44)
+            M = M.copy()
+            M[:, 2] += root
+            extras["eye_M"] = M
+        yield layered.compose(frame, flow, root), name, extras
         if progress:
             progress(i + 1, n)
+
+
+class Finisher:
+    """Output stage: tight framing, anime super-resolution, crisp eyes."""
+
+    def __init__(self, box, scale: float, eyes_rest=None, lash=None, sprites=None, upscaler=None):
+        self.box, self.scale = box, scale
+        x0, y0, x1, y1 = box
+        self.size = (int((x1 - x0) * scale) // 2 * 2, int((y1 - y0) * scale) // 2 * 2)
+        sx, sy = self.size[0] / (x1 - x0), self.size[1] / (y1 - y0)
+        self.S = np.float32([[sx, 0, -x0 * sx], [0, sy, -y0 * sy]])
+        self.eyes_rest, self.lash, self.sprites, self.up = eyes_rest, lash, sprites or {}, upscaler
+        self.lashes = None
+        self.rest_final = None
+
+    def prepare(self, rest_rgba: np.ndarray):
+        """Lifts the character's own upper lashes from the neutral pose at
+        output resolution, to draw closed eyes in her style."""
+        import cv2
+
+        from . import eyes as E
+
+        if not self.eyes_rest:
+            return
+        x0, y0, x1, y1 = self.box
+        crop = rest_rgba[y0:y1, x0:x1]
+        rest = self.up(crop, self.size) if self.up else cv2.resize(crop, self.size, interpolation=cv2.INTER_LANCZOS4)
+        self.rest_final = {k: e.transformed(self.S) for k, e in self.eyes_rest.items()}
+        self.lashes = {k: E.extract_lash(rest, e) for k, e in self.rest_final.items()}
+
+    def __call__(self, rgba: np.ndarray, extras: dict) -> np.ndarray:
+        import cv2
+
+        from . import eyes as E
+
+        x0, y0, x1, y1 = self.box
+        crop = rgba[y0:y1, x0:x1]
+        out = self.up(crop, self.size) if self.up else cv2.resize(crop, self.size, interpolation=cv2.INTER_LANCZOS4)
+        if self.eyes_rest and "eye_M" in extras:
+            M = np.vstack([extras["eye_M"], [0, 0, 1]])
+            T = (np.vstack([self.S, [0, 0, 1]]) @ M)[:2]
+            eyes = {k: e.transformed(T) for k, e in self.eyes_rest.items()}
+            sprites = {k: cv2.warpAffine(v, T, self.size, flags=cv2.INTER_CUBIC) for k, v in self.sprites.items()}
+            # rest eyes follow the head too, so lash sprites stay registered
+            rest = {k: e.transformed(T) for k, e in self.eyes_rest.items()}
+            out = E.apply(out, eyes, extras["eye_states"], self.lash, sprites, self.lashes, rest)
+        return out

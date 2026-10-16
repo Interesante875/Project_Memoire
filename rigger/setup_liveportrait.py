@@ -123,6 +123,12 @@ def setup_anime():
             urllib.request.urlretrieve(ANIME_FACE_CASCADE, cascade)
         except OSError as e:
             print(f"Anime face detector unavailable ({e}); head placement falls back to the silhouette.")
+    sr = ROOT / "vendor" / "models" / "realesr-animevideov3.pth"
+    if not sr.exists():
+        sr.parent.mkdir(parents=True, exist_ok=True)
+        urllib.request.urlretrieve(
+            "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth", sr)
+    run(sys.executable, "-m", "pip", "install", "psd-tools")
     print(f"Anime engine ready in {tha}")
 
 

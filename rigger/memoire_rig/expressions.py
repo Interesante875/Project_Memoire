@@ -54,7 +54,7 @@ def act_neutral(t):
 
 def act_happy(t):
     hop = math.sin(math.pi * 1.7 * t) ** 2  # smooth: no infinite jolt at landing
-    return {"neck_z": 0.35 * math.sin(t * 3.4), "head_x": -0.1 * hop}, (0.0, -16.0 * hop)
+    return {"neck_z": 0.35 * math.sin(t * 3.4), "head_x": -0.1 * hop}, (0.0, -12.0 * hop)
 
 
 def act_laugh(t):
@@ -66,7 +66,7 @@ def act_laugh(t):
 def act_surprised(t):
     jolt = _pulse(t, 0.35, 0.18)
     back = min(1.0, t / 0.35)
-    return {"head_x": -0.35 * back, "body_y": 0.0}, (0.0, -22.0 * jolt)
+    return {"head_x": -0.35 * back, "body_y": 0.0}, (0.0, -13.0 * jolt)
 
 
 def act_wink(t):

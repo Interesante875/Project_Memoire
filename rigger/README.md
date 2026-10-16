@@ -150,6 +150,22 @@ Bends are zero at the attachment and grow toward the tip, so there is no seam wh
 - **Limit the swing:** use `max_angle`, in radians.
 - **Parts over open background:** set `"fill": "clear"` (e.g. a ponytail). The base behind them stays transparent instead of being inpainted.
 
+### Crisp eyes, sharper output, and layered art
+
+- **Eyes.** Add `"eyes": {"left": [cx, cy, rx, ry], "right": [...]}` to the rig JSON (canvas coordinates). THA3 then keeps the eyes open and a separate pass closes them at output resolution:
+  - The real lid slides down over the crisp eye.
+  - Full closure is drawn with the character's own upper lash, lifted from the open eye. It is flipped into `︶` for blinks and sleep, and kept as an arch for happy `^` eyes.
+- **Framing.** Bust shots are framed just above where the source picture is cut off (`--frame-margin`). That cut is never on screen, and long hair runs naturally out of frame.
+- **Super-resolution.** Frames are upscaled with Real-ESRGAN's `realesr-animevideov3` (BSD-3), which is small enough for CPU. Turn it off with `--no-sr`.
+- **Accessory modes.** Small stiff parts such as clips, ornaments and short locks use `"mode": "warp"`, which bends them in place so they stay glued to the hair while the head turns. Large swinging parts such as ponytails use the default `"mode": "layer"`.
+- **Layered art (best quality).** Pass `--layers art.psd` or `--layers folder/` instead of `--source`. Name the layers:
+  - `base`
+  - one per accessory, e.g. `ponytail`, `hair_clip`
+  - optionally `eye_closed_left`/`right` and `eye_happy_left`/`right`
+
+  Drawn parts are used whole, the hair behind them is already painted, and drawn closed eyes replace the procedural ones. See `memoire_rig/layered_art.py`.
+- **Custom timeline.** For example `--beats neutral:2,happy:2.5,wink:2`.
+
 ## Tips
 
 - Use a sharp, front-facing photo with one person and the full face visible, ideally with eyes open and mouth closed.
@@ -175,6 +191,9 @@ rigger/
     anime.py              anime engine: head finding, THA3 layout, performance loop, export
     expressions.py        expression presets, acting motions, timeline, head kinematics
     physics.py            accessory layers, pendulum-chain + stretch physics, bend warp
+    eyes.py               crisp eye closing from the character's own lashes
+    upscale.py            anime super-resolution (Real-ESRGAN animevideov3)
+    layered_art.py        PSD / PNG-folder layered art import
     __main__.py           CLI: serve | cam | rig | anime
   web/                    browser studio (index.html, app.js, style.css)
 ```

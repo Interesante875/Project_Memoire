@@ -56,6 +56,10 @@ class Accessory:
     # what the base shows behind the part: "inpaint" (it covers the body) or
     # "clear" (it hangs over open background, e.g. a ponytail)
     fill: str = "inpaint"
+    # "layer": cut out and composited (large swings, e.g. a ponytail);
+    # "warp": bent in place on the posed frame, so it stays glued to the hair
+    # as the head turns (small stiff parts: clips, ornaments, short locks)
+    mode: str = "layer"
     ext: float = 0.0
     ext_v: float = 0.0
     # state
@@ -153,7 +157,7 @@ class LayeredRig:
     the base is inpainted underneath, and layers are re-composited each frame
     after following the head and bending with their physics."""
 
-    def __init__(self, canvas_rgba: np.ndarray, accessories: list[Accessory]):
+    def __init__(self, canvas_rgba: np.ndarray, accessories: list[Accessory], art: dict | None = None):
         self.acc = accessories
         size = canvas_rgba.shape[0]
         self.size = size
@@ -163,11 +167,25 @@ class LayeredRig:
         hole = np.zeros((size, size), np.uint8)
         clear = np.zeros((size, size), np.uint8)
         self.layers, self.masks = [], []
+        self.warp_masks = {}
         for a in accessories:
             m = np.zeros((size, size), np.uint8)
             cv2.fillPoly(m, [np.int32(np.round(a.polygon))], 255)
+            if a.mode == "warp":
+                k = int(a.feather * 3) | 1
+                self.warp_masks[a.name] = cv2.GaussianBlur(m.astype(np.float32) / 255, (k, k), a.feather)
+                self.layers.append(None)
+                self.masks.append(m)
+                continue
+            if art and a.name in art:
+                layer = art[a.name]
+                self.layers.append(layer)
+                self.masks.append(m)
+                hole |= m if a.fill != "clear" else 0
+                clear |= m if a.fill == "clear" else 0
+                continue
             # the layer overlaps its hole by ~2px so no seam shows at the cut
-            grown = cv2.dilate(m, np.ones((5, 5), np.uint8))
+            grown = cv2.dilate(m, np.ones((7, 7), np.uint8))
             soft = cv2.GaussianBlur(grown.astype(np.float32) / 255, (3, 3), 0.8)
             layer = canvas_rgba.copy()
             layer[..., 3] = (alpha * soft * 255).round().astype(np.uint8)
@@ -186,8 +204,13 @@ class LayeredRig:
         # Only keep inpainted coverage that is surrounded by the body; open
         # background stays transparent.
         base_a = np.where(hole > 0, np.where(base_a > 110, 255, 0), a8).astype(np.uint8)
-        base_a[cv2.dilate(clear, np.ones((3, 3), np.uint8)) > 0] = 0
+        # cleared areas fade out over a few px, so the pose engine doesn't see
+        # (and draw) a hard cut edge in the hair
+        clear_soft = cv2.GaussianBlur(cv2.dilate(clear, np.ones((3, 3), np.uint8)).astype(np.float32) / 255, (0, 0), 2.0)
+        base_a = (base_a * (1 - clear_soft)).astype(np.uint8)
         self.base = np.dstack([base_rgb, base_a]).astype(np.uint8)
+        if art and "base" in art:
+            self.base = art["base"]  # artist-drawn base: nothing to guess
         # Busts are cut off at the bottom of the source; fade that edge so
         # swinging parts don't show a hard cut.
         rows = np.where(canvas_rgba[..., 3].max(1) > 0)[0]
@@ -198,13 +221,13 @@ class LayeredRig:
     def set_reference(self, neutral_base_render: np.ndarray):
         self.reference = neutral_base_render
 
-    def head_transform(self, a: Accessory, flow: np.ndarray | None) -> np.ndarray:
+    def head_transform(self, a: Accessory, flow: np.ndarray | None, radius: int = 28) -> np.ndarray:
         """2x3 similarity that carries the accessory's attachment area from the
         neutral render to the current one, fitted to optical flow around the
         anchor."""
         if flow is None:
             return np.float32([[1, 0, 0], [0, 1, 0]])
-        r = 28
+        r = radius
         ax, ay = map(int, a.anchor)
         y0, y1 = max(0, ay - r), min(self.size, ay + r)
         x0, x1 = max(0, ax - r), min(self.size, ax + r)
@@ -213,10 +236,33 @@ class LayeredRig:
         M, _ = cv2.estimateAffinePartial2D(rest, cur, method=cv2.RANSAC, ransacReprojThreshold=2.0)
         return M if M is not None else np.float32([[1, 0, 0], [0, 1, 0]])
 
+    def warp_in_place(self, frame: np.ndarray, flow: np.ndarray | None) -> np.ndarray:
+        """Bends the "warp"-mode parts directly on the posed frame. The bend is
+        defined at rest and carried to the current pose by the optical flow,
+        so the parts stay glued to the hair whatever the head does."""
+        F = np.zeros((self.size, self.size, 2), np.float32)
+        for a in self.acc:
+            if a.mode == "warp" and (abs(a.th[0]) > 1e-4 or abs(a.th[1]) > 1e-4 or a.ext):
+                F += bend_field(a, self.grid) * self.warp_masks[a.name][..., None]
+        if not F.any():
+            return frame
+        q = self.grid
+        if flow is not None:
+            r = q + flow
+            F = cv2.remap(F, r[..., 0], r[..., 1], cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+        p = q.copy()
+        for _ in range(4):
+            p = q - cv2.remap(F, p[..., 0], p[..., 1], cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+        out = cv2.remap(premultiply(frame), p[..., 0], p[..., 1], cv2.INTER_LINEAR,
+                        borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+        return unpremultiply(out)
+
     def compose(self, base_frame: np.ndarray, flow: np.ndarray | None, root=(0.0, 0.0)) -> np.ndarray:
-        out = premultiply(base_frame)
+        out = premultiply(self.warp_in_place(base_frame, flow))
         q = self.grid
         for a, layer in zip(self.acc, self.layers):
+            if layer is None:
+                continue
             M = self.head_transform(a, flow)
             Minv = cv2.invertAffineTransform(M)
             r = (q @ Minv[:, :2].T + Minv[:, 2]).astype(np.float32)  # current -> rest
