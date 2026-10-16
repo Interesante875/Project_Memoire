@@ -48,8 +48,16 @@ def _pulse(x: float, at: float, width: float) -> float:
 Acting = Callable[[float], tuple[dict[str, float], tuple[float, float]]]
 
 
+def _glance(t: float) -> float:
+    """Quick eye darts with holds: -1 / 0 / +1 steps, smoothed."""
+    k = (t * 0.9) % 3.0
+    target = (0.0, 0.8, -0.7)[int(k)]
+    return target * min(1.0, (k % 1.0) / 0.12)
+
+
 def act_neutral(t):
-    return {"head_y": 0.25 * math.sin(t * 1.3), "neck_z": 0.12 * math.sin(t * 0.9)}, (0.0, 0.0)
+    return ({"head_y": 0.25 * math.sin(t * 1.3), "neck_z": 0.12 * math.sin(t * 0.9),
+             "iris_rotation_y": _glance(t)}, (0.0, 0.0))
 
 
 def act_happy(t):

@@ -152,9 +152,7 @@ Bends are zero at the attachment and grow toward the tip, so there is no seam wh
 
 ### Crisp eyes, sharper output, and layered art
 
-- **Eyes.** Add `"eyes": {"left": [cx, cy, rx, ry], "right": [...]}` to the rig JSON (canvas coordinates). THA3 then keeps the eyes open and a separate pass closes them at output resolution:
-  - The real lid slides down over the crisp eye.
-  - Full closure is drawn with the character's own upper lash, lifted from the open eye. It is flipped into `︶` for blinks and sleep, and kept as an arch for happy `^` eyes.
+- **Eyes (experimental, off by default).** By default THA3 draws the eyes, which gives the most natural result. To try the separate eye passes instead, add `"eyes": {"left": [cx, cy, rx, ry], "right": [...]}` (canvas coordinates) to the rig JSON. Those passes are `eyes.py` and the detailed capture rig in `eyerig.py`. They redraw the eyes from captured lashes, iris and highlights, but on small, low-resolution sources they can look off-model.
 - **Framing.** Bust shots are framed just above where the source picture is cut off (`--frame-margin`). That cut is never on screen, and long hair runs naturally out of frame.
 - **Super-resolution.** Frames are upscaled with Real-ESRGAN's `realesr-animevideov3` (BSD-3), which is small enough for CPU. Turn it off with `--no-sr`.
 - **Accessory modes.** Small stiff parts such as clips, ornaments and short locks use `"mode": "warp"`, which bends them in place so they stay glued to the hair while the head turns. Large swinging parts such as ponytails use the default `"mode": "layer"`.
@@ -191,7 +189,8 @@ rigger/
     anime.py              anime engine: head finding, THA3 layout, performance loop, export
     expressions.py        expression presets, acting motions, timeline, head kinematics
     physics.py            accessory layers, pendulum-chain + stretch physics, bend warp
-    eyes.py               crisp eye closing from the character's own lashes
+    eyes.py               experimental eye-closing pass (opt-in)
+    eyerig.py             experimental detailed eye capture + rig (opt-in)
     upscale.py            anime super-resolution (Real-ESRGAN animevideov3)
     layered_art.py        PSD / PNG-folder layered art import
     __main__.py           CLI: serve | cam | rig | anime

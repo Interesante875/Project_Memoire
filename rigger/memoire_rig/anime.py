@@ -324,7 +324,8 @@ def render_showreel(rig: AnimeRig, layered, timeline, fps: int = 24, substeps: i
         extras = {"root": root}
         if eyes_rest:
             extras["eye_states"] = E.eye_states(p)
-            p = E.strip_eye_closing(p)
+            extras["gaze"] = E.gaze_of(p)
+            p = E.strip_eye_closing(p, with_gaze=True)
         frame = rig.render(p)
         flow = back_flow(frame, neutral)
         if eyes_rest:
@@ -367,6 +368,11 @@ class Finisher:
         rest = self.up(crop, self.size) if self.up else cv2.resize(crop, self.size, interpolation=cv2.INTER_LANCZOS4)
         self.rest_final = {k: e.transformed(self.S) for k, e in self.eyes_rest.items()}
         self.lashes = {k: E.extract_lash(rest, e) for k, e in self.rest_final.items()}
+        # detailed capture: lash, lower lid, iris/pupil, highlights, eye white
+        from . import eyerig
+
+        self.eye_parts = {k: eyerig.capture(rest, e) for k, e in self.rest_final.items()}
+        self.capture_debug = {k: eyerig.debug_view(p) for k, p in self.eye_parts.items() if p is not None}
 
     def __call__(self, rgba: np.ndarray, extras: dict) -> np.ndarray:
         import cv2
@@ -381,7 +387,22 @@ class Finisher:
             T = (np.vstack([self.S, [0, 0, 1]]) @ M)[:2]
             eyes = {k: e.transformed(T) for k, e in self.eyes_rest.items()}
             sprites = {k: cv2.warpAffine(v, T, self.size, flags=cv2.INTER_CUBIC) for k, v in self.sprites.items()}
-            # rest eyes follow the head too, so lash sprites stay registered
-            rest = {k: e.transformed(T) for k, e in self.eyes_rest.items()}
-            out = E.apply(out, eyes, extras["eye_states"], self.lash, sprites, self.lashes, rest)
+            from . import eyerig
+
+            parts = getattr(self, "eye_parts", {}) or {}
+            fallback = {}
+            for side, e in eyes.items():
+                pt = parts.get(side)
+                k, happy = extras["eye_states"][side]
+                sp = sprites.get(f"eye_{'happy' if happy else 'closed'}_{side}")
+                if pt is not None and sp is None:
+                    # rest output coords -> current output coords
+                    Tr = (np.vstack([T, [0, 0, 1]]) @ np.vstack([cv2.invertAffineTransform(self.S), [0, 0, 1]]))[:2]
+                    gaze, iscale = extras.get("gaze", ((0.0, 0.0), 1.0))
+                    out = eyerig.render(out, pt, Tr, k, happy, gaze, iscale)
+                else:
+                    fallback[side] = e
+            if fallback:
+                rest = {k: e.transformed(T) for k, e in self.eyes_rest.items()}
+                out = E.apply(out, fallback, extras["eye_states"], self.lash, sprites, self.lashes, rest)
         return out

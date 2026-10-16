@@ -246,11 +246,22 @@ def eye_states(p: dict[str, float]) -> dict[str, tuple[float, bool]]:
 
 
 EYE_CLOSING_PARAMS = ("eye_wink", "eye_happy_wink", "eye_relaxed")
+EYE_RIG_PARAMS = EYE_CLOSING_PARAMS + ("iris_rotation", "iris_small")
 
 
-def strip_eye_closing(p: dict[str, float]) -> dict[str, float]:
-    """Pose params with THA3's own eye closing removed (this pass does it)."""
-    return {k: v for k, v in p.items() if not k.startswith(EYE_CLOSING_PARAMS)}
+def gaze_of(p: dict[str, float]) -> tuple[tuple[float, float], float]:
+    """(gaze x, gaze y) in [-1, 1] and iris scale from THA3-style params."""
+    gx = float(np.clip(p.get("iris_rotation_y", 0.0), -1, 1))
+    gy = float(np.clip(-p.get("iris_rotation_x", 0.0), -1, 1))
+    small = max(p.get("iris_small_left", 0.0), p.get("iris_small_right", 0.0))
+    return (gx, gy), 1.0 - 0.22 * small
+
+
+def strip_eye_closing(p: dict[str, float], with_gaze: bool = False) -> dict[str, float]:
+    """Pose params with THA3's own eye closing (and with_gaze: iris motion)
+    removed, because the eye pass / eye rig does it crisply."""
+    keys = EYE_RIG_PARAMS if with_gaze else EYE_CLOSING_PARAMS
+    return {k: v for k, v in p.items() if not k.startswith(keys)}
 
 
 def cover_mask(img: np.ndarray, e: Eye) -> np.ndarray:

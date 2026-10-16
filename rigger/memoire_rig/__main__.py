@@ -163,6 +163,8 @@ def anime_showreel(args, rig, canvas, out_dir, name, t0, art=None):
         upscaler = AnimeUpscaler()
     finish = Finisher(box, args.scale, eyes_rest, lash, sprites, upscaler)
     finish.prepare(canvas)
+    for side, dbg in getattr(finish, "capture_debug", {}).items():
+        cv2.imwrite(str(out_dir / f"{name}_eye_capture_{side}.png"), cv2.cvtColor(dbg, cv2.COLOR_RGB2BGR))
     writer = StreamWriter(out_dir, f"{name}_showreel", args.fps, box, scale=args.scale)
     timeline = Timeline()
     if args.beats:
