@@ -148,6 +148,7 @@ Bends are zero at the attachment and grow toward the tip, so there is no seam wh
 - **Small ornaments:** high `stiffness` with low `inertia`, so they flick and settle fast.
 - **More bounce:** lower `damping`.
 - **Limit the swing:** use `max_angle`, in radians.
+- **Parts over open background:** set `"fill": "clear"` (e.g. a ponytail). The base behind them stays transparent instead of being inpainted.
 
 ## Tips
 

@@ -53,6 +53,9 @@ class Accessory:
     stretch_stiffness: float = 0.0
     stretch_damping: float = 6.0
     max_stretch: float = 0.08
+    # what the base shows behind the part: "inpaint" (it covers the body) or
+    # "clear" (it hangs over open background, e.g. a ponytail)
+    fill: str = "inpaint"
     ext: float = 0.0
     ext_v: float = 0.0
     # state
@@ -158,16 +161,22 @@ class LayeredRig:
         self.grid = np.stack([xs, ys], -1)
         alpha = canvas_rgba[..., 3].astype(np.float32) / 255
         hole = np.zeros((size, size), np.uint8)
+        clear = np.zeros((size, size), np.uint8)
         self.layers, self.masks = [], []
         for a in accessories:
             m = np.zeros((size, size), np.uint8)
             cv2.fillPoly(m, [np.int32(np.round(a.polygon))], 255)
-            soft = cv2.GaussianBlur(m.astype(np.float32) / 255, (3, 3), 0.8)
+            # the layer overlaps its hole by ~2px so no seam shows at the cut
+            grown = cv2.dilate(m, np.ones((5, 5), np.uint8))
+            soft = cv2.GaussianBlur(grown.astype(np.float32) / 255, (3, 3), 0.8)
             layer = canvas_rgba.copy()
             layer[..., 3] = (alpha * soft * 255).round().astype(np.uint8)
             self.layers.append(layer)
             self.masks.append(m)
-            hole |= m
+            if a.fill == "clear":
+                clear |= m
+            else:
+                hole |= m
         # Base: remove the accessories and inpaint what was behind them.
         hole = cv2.dilate(hole, np.ones((3, 3), np.uint8))
         rgb = np.ascontiguousarray(canvas_rgba[..., :3])
@@ -177,7 +186,13 @@ class LayeredRig:
         # Only keep inpainted coverage that is surrounded by the body; open
         # background stays transparent.
         base_a = np.where(hole > 0, np.where(base_a > 110, 255, 0), a8).astype(np.uint8)
+        base_a[cv2.dilate(clear, np.ones((3, 3), np.uint8)) > 0] = 0
         self.base = np.dstack([base_rgb, base_a]).astype(np.uint8)
+        # Busts are cut off at the bottom of the source; fade that edge so
+        # swinging parts don't show a hard cut.
+        rows = np.where(canvas_rgba[..., 3].max(1) > 0)[0]
+        bottom = rows[-1] if len(rows) else size
+        self.fade = np.clip((bottom - np.arange(size, dtype=np.float32)) / 14.0, 0, 1)[:, None, None]
         self.reference = None
 
     def set_reference(self, neutral_base_render: np.ndarray):
@@ -211,7 +226,7 @@ class LayeredRig:
             lp = cv2.remap(premultiply(layer), p[..., 0], p[..., 1], cv2.INTER_LINEAR,
                            borderMode=cv2.BORDER_CONSTANT, borderValue=0)
             out = lp + out * (1 - lp[..., 3:4] / 255.0)
-        res = unpremultiply(out)
+        res = unpremultiply(out * self.fade)
         if root != (0.0, 0.0):
             T = np.float32([[1, 0, root[0]], [0, 1, root[1]]])
             res = unpremultiply(cv2.warpAffine(premultiply(res), T, (self.size, self.size),
